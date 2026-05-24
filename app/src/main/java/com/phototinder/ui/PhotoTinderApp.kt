@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,14 +43,17 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
+// ─── Data ─────────────────────────────────────────────────────────
+
 data class PhotoItem(
     val uri: Uri,
     val name: String,
-    val albumName: String,
-    val dateAdded: Long
+    val albumName: String
 )
 
 enum class SwipeAction { KEEP, TRASH }
+
+// ─── Main App ─────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,17 +71,32 @@ fun PhotoTinderApp() {
     var albums by remember { mutableStateOf<List<Pair<String, List<PhotoItem>>>>(emptyList()) }
     var selectedAlbums by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showStatsToast by remember { mutableStateOf<String?>(null) }
+    var hasPermission by remember { mutableStateOf(false) }
+
+    // Check initial permission
+    LaunchedEffect(Unit) {
+        hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+        if (hasPermission) {
+            val result = withContext(Dispatchers.IO) { fetchAllAlbums(context) }
+            albums = result.first
+            selectedAlbums = albums.map { it.first }.toSet()
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            isProcessing = false
-            val fetched = fetchPhotos(context, selectedAlbums.toList())
-            albums = fetched
-            photos = fetched.second
-            currentIndex = 0
-            processedCount = 0
+            hasPermission = true
+            scope.launch {
+                val result = withContext(Dispatchers.IO) { fetchAllAlbums(context) }
+                albums = result.first
+                selectedAlbums = albums.map { it.first }.toSet()
+            }
         } else {
             showPermissionDenied = true
         }
@@ -90,18 +107,17 @@ fun PhotoTinderApp() {
     ) { permissions ->
         val allGranted = permissions.values.all { it }
         if (allGranted) {
-            isProcessing = false
-            val fetched = fetchPhotos(context, selectedAlbums.toList())
-            albums = fetched
-            photos = fetched.second
-            currentIndex = 0
-            processedCount = 0
+            hasPermission = true
+            scope.launch {
+                val result = withContext(Dispatchers.IO) { fetchAllAlbums(context) }
+                albums = result.first
+                selectedAlbums = albums.map { it.first }.toSet()
+            }
         } else {
             showPermissionDenied = true
         }
     }
 
-    // Show toast for stats
     LaunchedEffect(showStatsToast) {
         showStatsToast?.let {
             kotlinx.coroutines.delay(2000)
@@ -109,204 +125,167 @@ fun PhotoTinderApp() {
         }
     }
 
-    Scaffold(
-        floatingActionButton = {
-            if (photos.isNotEmpty()) {
-                FloatingActionButton(
-                    onClick = {
-                        scope.launch {
-                            val action = SwipeAction.KEEP
-                            withContext(Dispatchers.IO) {
-                                moveToTrash(context, photos[currentIndex].uri)
-                            }
-                            trashedPhotos = trashedPhotos + photos[currentIndex]
-                            photos = photos.filterIndexed { i, _ -> i != currentIndex }
-                            processedCount++
-                            if (photos.isEmpty()) showStatsToast = "Completaste Kept"
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = "setup"
+        ) {
+            composable("setup") {
+                SetupScreen(
+                    albums = albums,
+                    selectedAlbums = selectedAlbums,
+                    onAlbumToggle = { album ->
+                        selectedAlbums = if (album in selectedAlbums) {
+                            selectedAlbums - album
+                        } else {
+                            selectedAlbums + album
                         }
                     },
-                    containerColor = Color(0xFF4CAF50)
-                ) {
-                }
-            }
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            NavHost(
-                navController = navController,
-                startDestination = "setup"
-            ) {
-                composable("setup") {
-                    AlbumSelectionScreen(
-                        albums = albums,
-                        selectedAlbums = selectedAlbums,
-                        onAlbumToggle = { album ->
-                            selectedAlbums = if (selectedAlbums.contains(album)) {
-                                selectedAlbums - album
-                            } else {
-                                selectedAlbums + album
-                        },
-                        onSelectAll = {
-                            selectedAlbums = albums.map { it.first }.toSet()
-                        },
-                        onDeselectAll = {
-                            selectedAlbums = emptySet()
-                        },
-                        onStart = {
-                            isProcessing = true
+                    onSelectAll = {
+                        selectedAlbums = albums.map { it.first }.toSet()
+                    },
+                    onDeselectAll = {
+                        selectedAlbums = emptySet()
+                    },
+                    onStart = {
+                        if (!hasPermission) {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED) {
-                                    val fetched = fetchPhotos(context, selectedAlbums.toList())
-                                    albums = fetched
-                                    photos = fetched.second
-                                    currentIndex = 0
-                                    processedCount = 0
-                                } else {
-                                    multiplePermissionsLauncher.launch(arrayOf(Manifest.permission.READ_MEDIA_IMAGES))
-                                }
+                                multiplePermissionsLauncher.launch(arrayOf(Manifest.permission.READ_MEDIA_IMAGES))
                             } else {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-                                    val fetched = fetchPhotos(context, selectedAlbums.toList())
-                                    albums = fetched
-                                    photos = fetched.second
-                                    currentIndex = 0
-                                    processedCount = 0
-                                } else {
-                                    permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-                                }
+                                permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
                             }
-                        },
-                        onLoad = {
+                        } else {
                             scope.launch {
-                                val result = fetchAllAlbums(context)
-                                albums = result.first
+                                val result = withContext(Dispatchers.IO) {
+                                    fetchPhotos(context, selectedAlbums.toList())
+                                }
                                 photos = result.second
-                                selectedAlbums = albums.map { it.first }.toSet()
+                                currentIndex = 0
+                                processedCount = 0
+                                navController.navigate("swipe")
                             }
-                        },
-                        photos = photos,
-                        currentIndex = currentIndex,
-                        hasMore = currentIndex < photos.size
-                    )
-                }
+                        }
+                    },
+                    hasPermission = hasPermission,
+                    isProcessing = isProcessing
+                )
+            }
 
-                composable("swipe") {
-                    SwipeScreen(
-                        photos = photos,
-                        currentIndex = currentIndex,
-                        onSwiped = { action ->
-                            scope.launch {
-                                val currentPhoto = photos[currentIndex]
-                                when (action) {
-                                    SwipeAction.TRASH -> {
-                                        withContext(Dispatchers.IO) {
-                                            moveToTrash(context, currentPhoto.uri)
-                                        }
-                                        trashedPhotos = trashedPhotos + currentPhoto
+            composable("swipe") {
+                SwipeScreen(
+                    photos = photos,
+                    trashedPhotos = trashedPhotos,
+                    currentIndex = currentIndex,
+                    onSwiped = { action, photo ->
+                        scope.launch {
+                            when (action) {
+                                SwipeAction.TRASH -> {
+                                    withContext(Dispatchers.IO) {
+                                        moveToTrash(context, photo.uri)
                                     }
-                                    SwipeAction.KEEP -> {
-                                        // Photo stays in place
-                                    }
+                                    trashedPhotos = trashedPhotos + photo
                                 }
-                                photos = photos.filterIndexed { i, _ -> i != currentIndex }
-                                processedCount++
+                                SwipeAction.KEEP -> { /* nada, se queda */ }
                             }
-                        },
-                        onIndexChange = { currentIndex = it },
-                        onBack = { navController.popBackStack() },
-                        onTrash = { navController.navigate("trash") }
-                    )
-                }
+                            photos = photos.filterIndexed { i, _ -> i != currentIndex }
+                            processedCount++
+                            if (photos.isEmpty() || currentIndex >= photos.size) {
+                                showStatsToast = "¡Completaste! 🎉"
+                            }
+                        }
+                    },
+                    onIndexChange = { currentIndex = it },
+                    onBack = { navController.popBackStack() },
+                    onTrash = { navController.navigate("trash") },
+                    onFinish = { navController.popBackStack() }
+                )
+            }
 
-                composable("trash") {
-                    TrashScreen(
-                        trashed = trashedPhotos,
-                        onRecover = { photo ->
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    recoverFromTrash(context, photo.uri)
-                                }
-                                trashedPhotos = trashedPhotos - photo
+            composable("trash") {
+                TrashScreen(
+                    trashed = trashedPhotos,
+                    onRecover = { photo ->
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                recoverFromTrash(context, photo.uri)
                             }
-                        },
-                        onDeletePermanently = { photo ->
+                            trashedPhotos = trashedPhotos - photo
+                        }
+                    },
+                    onDeletePermanently = { photo ->
+                        scope.launch {
                             withContext(Dispatchers.IO) {
                                 deletePermanently(context, photo.uri)
                             }
                             trashedPhotos = trashedPhotos - photo
-                        },
-                        onEmptyTrash = {
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    trashedPhotos.forEach { deletePermanently(context, it.uri) }
-                                }
-                                trashedPhotos = emptyList()
-                            }
-                        },
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-            }
-
-            if (showPermissionDenied) {
-                AlertDialog(
-                    onDismissRequest = { showPermissionDenied = false },
-                    title = { Text("Permiso denegado") },
-                    text = { Text("Necesitamos acceso a tus fotos. Ve a Ajustes > Permisos.") },
-                    confirmButton = {
-                        TextButton(onClick = { showPermissionDenied = false }) {
                         }
-                    }
+                    },
+                    onEmptyTrash = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                trashedPhotos.forEach { deletePermanently(context, it.uri) }
+                            }
+                            trashedPhotos = emptyList()
+                        }
+                    },
+                    onBack = { navController.popBackStack() }
                 )
             }
+        }
 
-            showStatsToast?.let { msg ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 64.dp),
-                    contentAlignment = Alignment.TopCenter
-                ) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF333333)),
-                        shape = RoundedCornerShape(24.dp)
-                    ) {
-                        Text(
-                            text = msg,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                            color = Color.White
-                        )
+        // Permission denied dialog
+        if (showPermissionDenied) {
+            AlertDialog(
+                onDismissRequest = { showPermissionDenied = false },
+                title = { Text("Permiso denegado") },
+                text = { Text("Necesitamos acceso a tus fotos. Ve a Ajustes > Permisos.") },
+                confirmButton = {
+                    TextButton(onClick = { showPermissionDenied = false }) {
+                        Text("OK")
                     }
+                }
+            )
+        }
+
+        // Stats toast
+        showStatsToast?.let { msg ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 64.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF333333)),
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Text(
+                        text = msg,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                        color = Color.White
+                    )
                 }
             }
         }
     }
 }
 
+// ─── Setup Screen ─────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlbumSelectionScreen(
+fun SetupScreen(
     albums: List<Pair<String, List<PhotoItem>>>,
     selectedAlbums: Set<String>,
     onAlbumToggle: (String) -> Unit,
     onSelectAll: () -> Unit,
     onDeselectAll: () -> Unit,
     onStart: () -> Unit,
-    onLoad: () -> Unit,
-    photos: List<PhotoItem>,
-    currentIndex: Int,
-    hasMore: Boolean
+    hasPermission: Boolean,
+    isProcessing: Boolean
 ) {
-    val totalPhotos = albums.sumOf { it.second.size }
     val selectedCount = selectedAlbums.size
     val selectedPhotos = albums.filter { it.first in selectedAlbums }.sumOf { it.second.size }
-
-    LaunchedEffect(Unit) {
-        onLoad()
-    }
 
     Column(
         modifier = Modifier
@@ -314,9 +293,7 @@ fun AlbumSelectionScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "📸 Photo Tinder",
                 fontSize = 28.sp,
@@ -325,56 +302,55 @@ fun AlbumSelectionScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Selecciona álbumes para revisar",
+                text = if (hasPermission) "Selecciona álbumes para revisar"
+                       else "Primero necesitamos permiso para acceder a tus fotos",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
             )
         }
 
-        // Stats chips
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SuggestionChip(
-                onClick = { },
-                label = { Text("$selectedCount álbumes") }
-            )
-            SuggestionChip(
-                onClick = { },
-                label = { Text("$selectedPhotos fotos") }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Select/Deselect all buttons
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = onSelectAll,
-                modifier = Modifier.weight(1f)
+        if (!hasPermission) {
+            // Permission request UI
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                Text("Todos", fontSize = 12.sp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.PhotoLibrary,
+                        contentDescription = null,
+                        modifier = Modifier.size(80.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        "Acceso a fotos",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Para funcionar, Photo Tinder necesita acceder a tus fotos",
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Button(
+                        onClick = onStart,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 48.dp)
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(Icons.Default.LockOpen, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Dar permiso", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
-            OutlinedButton(
-                onClick = onDeselectAll,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Ninguno", fontSize = 12.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Album list
-        if (albums.isEmpty()) {
+        } else if (albums.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -386,10 +362,54 @@ fun AlbumSelectionScreen(
                 }
             }
         } else {
+            // Stats chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SuggestionChip(
+                    onClick = { },
+                    label = { Text("$selectedCount álbumes") }
+                )
+                SuggestionChip(
+                    onClick = { },
+                    label = { Text("$selectedPhotos fotos") }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Select/Deselect all
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onSelectAll,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Todos", fontSize = 12.sp)
+                }
+                OutlinedButton(
+                    onClick = onDeselectAll,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Ninguno", fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Album scrollable list
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 16.dp)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
             ) {
                 albums.sortedByDescending { it.second.size }.forEach { (albumName, albumPhotos) ->
                     val isSelected = albumName in selectedAlbums
@@ -429,37 +449,41 @@ fun AlbumSelectionScreen(
                     }
                 }
             }
-        }
 
-        // Start button
-        Button(
-            onClick = onStart,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .height(56.dp),
-            enabled = selectedAlbums.isNotEmpty(),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                "Empezar ($selectedPhotos fotos)",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
+            // Start button
+            Button(
+                onClick = onStart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .height(56.dp),
+                enabled = selectedAlbums.isNotEmpty(),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Empezar ($selectedPhotos fotos)",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
 
+// ─── Swipe Screen ─────────────────────────────────────────────────
+
 @Composable
 fun SwipeScreen(
     photos: List<PhotoItem>,
+    trashedPhotos: List<PhotoItem>,
     currentIndex: Int,
-    onSwiped: (SwipeAction) -> Unit,
+    onSwiped: (SwipeAction, PhotoItem) -> Unit,
     onIndexChange: (Int) -> Unit,
     onBack: () -> Unit,
-    onTrash: () -> Unit
+    onTrash: () -> Unit,
+    onFinish: () -> Unit
 ) {
     if (photos.isEmpty() || currentIndex >= photos.size) {
         // Done screen
@@ -482,13 +506,22 @@ fun SwipeScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("No quedan más fotos por revisar")
+                if (trashedPhotos.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "${trashedPhotos.size} fotos en la papelera",
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                    )
+                }
                 Spacer(modifier = Modifier.height(32.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     OutlinedButton(onClick = onBack) {
                         Text("Volver")
                     }
-                    Button(onClick = onTrash) {
-                        Text("🗑️ Papelera")
+                    if (trashedPhotos.isNotEmpty()) {
+                        Button(onClick = onTrash) {
+                            Text("🗑️ Papelera")
+                        }
                     }
                 }
             }
@@ -499,10 +532,8 @@ fun SwipeScreen(
     val photo = photos[currentIndex]
     val total = photos.size
     val offset = remember { mutableFloatStateOf(0f) }
-    var currentPhotoIndex by remember { mutableIntStateOf(currentIndex) }
 
     LaunchedEffect(currentIndex) {
-        currentPhotoIndex = currentIndex
         offset.floatValue = 0f
     }
 
@@ -597,7 +628,6 @@ fun SwipeScreen(
                     // Swipe indicators
                     val rotation = offset.floatValue / 20f
                     if (offset.floatValue < -50f) {
-                        // Trash indicator
                         Card(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
@@ -617,7 +647,6 @@ fun SwipeScreen(
                         }
                     }
                     if (offset.floatValue > 50f) {
-                        // Keep indicator
                         Card(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
@@ -651,8 +680,8 @@ fun SwipeScreen(
             // Trash button
             FloatingActionButton(
                 onClick = {
-                    onSwiped(SwipeAction.TRASH)
-                    if (currentIndex + 1 < total) {
+                    onSwiped(SwipeAction.TRASH, photo)
+                    if (currentIndex + 1 < photos.size) {
                         onIndexChange(currentIndex + 1)
                     }
                 },
@@ -665,8 +694,8 @@ fun SwipeScreen(
             // Keep button
             FloatingActionButton(
                 onClick = {
-                    onSwiped(SwipeAction.KEEP)
-                    if (currentIndex + 1 < total) {
+                    onSwiped(SwipeAction.KEEP, photo)
+                    if (currentIndex + 1 < photos.size) {
                         onIndexChange(currentIndex + 1)
                     }
                 },
@@ -679,6 +708,8 @@ fun SwipeScreen(
     }
 }
 
+// ─── Trash Screen ─────────────────────────────────────────────────
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrashScreen(
@@ -688,7 +719,6 @@ fun TrashScreen(
     onEmptyTrash: () -> Unit,
     onBack: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     var showConfirmDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -696,7 +726,6 @@ fun TrashScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Top bar
         TopAppBar(
             title = { Text("🗑️ Papelera (${trashed.size})") },
             navigationIcon = {
@@ -706,9 +735,7 @@ fun TrashScreen(
             },
             actions = {
                 if (trashed.isNotEmpty()) {
-                    TextButton(
-                        onClick = { showConfirmDialog = true }
-                    ) {
+                    TextButton(onClick = { showConfirmDialog = true }) {
                         Text("Vaciar", color = Color(0xFFE53935))
                     }
                 }
@@ -719,20 +746,24 @@ fun TrashScreen(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("🗑️", fontSize = 48.sp)
-                    Text("Papera vacía", fontSize = 18.sp)
+                    Text("Papelera vacía", fontSize = 18.sp)
                     Text("Las fotos eliminadas aparecerán aquí")
                 }
             }
         } else {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+            ) {
                 Text(
                     text = "${trashed.size} fotos en la papelera",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-                // Grid of trashed photos
-                trashed.forEachIndexed { index, photo ->
+                trashed.forEach { photo ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -798,13 +829,7 @@ fun TrashScreen(
 
 // ─── Data / Helpers ───────────────────────────────────────────────
 
-data class PhotoItem(
-    val uri: Uri,
-    val name: String,
-    val albumName: String
-)
-
-fun fetchAllAlbums(context: Context): Pair<List<Pair<String, List<PhotoItem>>>, List<PhotoItem>>> {
+fun fetchAllAlbums(context: Context): Pair<List<Pair<String, List<PhotoItem>>>, List<PhotoItem>> {
     val albums = mutableMapOf<String, MutableList<PhotoItem>>()
     val allPhotos = mutableListOf<PhotoItem>()
 
@@ -812,7 +837,6 @@ fun fetchAllAlbums(context: Context): Pair<List<Pair<String, List<PhotoItem>>>, 
     val projection = arrayOf(
         MediaStore.Images.Media._ID,
         MediaStore.Images.Media.DISPLAY_NAME,
-        MediaStore.Images.Media.DATE_ADDED,
         MediaStore.Images.Media.BUCKET_DISPLAY_NAME
     )
     val cursor = context.contentResolver.query(
@@ -822,12 +846,10 @@ fun fetchAllAlbums(context: Context): Pair<List<Pair<String, List<PhotoItem>>>, 
     cursor?.use {
         val idCol = it.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
         val nameCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-        val dateCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
         val bucketCol = it.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
         while (it.moveToNext()) {
             val id = it.getLong(idCol)
             val name = it.getString(nameCol) ?: "photo_$id"
-            val date = it.getLong(dateCol)
             val bucket = it.getString(bucketCol) ?: "Otros"
             val uri = ContentUris.withAppendedId(collection, id)
             val photo = PhotoItem(uri = uri, name = name, albumName = bucket)
@@ -856,7 +878,6 @@ fun moveToTrash(context: Context, photoUri: Uri) {
             }
             context.contentResolver.update(photoUri, values, null, null)
         } else {
-            // Pre-R: move to a .trash folder on disk
             val trashDir = File(context.getExternalFilesDir(null), ".phototinder_trash")
             if (!trashDir.exists()) trashDir.mkdirs()
             val inputStream = context.contentResolver.openInputStream(photoUri) ?: return
@@ -879,7 +900,6 @@ fun recoverFromTrash(context: Context, photoUri: Uri) {
             }
             context.contentResolver.update(photoUri, values, null, null)
         }
-        // Pre-R: more complex, would need to track original location
     } catch (_: Exception) {}
 }
 
