@@ -168,6 +168,7 @@ fun PhotoTinderApp() {
                             }
                         }
                     },
+                    onTrash = { navController.navigate("trash") },
                     hasPermission = hasPermission,
                     isProcessing = isProcessing
                 )
@@ -283,6 +284,7 @@ fun SetupScreen(
     onSelectAll: () -> Unit,
     onDeselectAll: () -> Unit,
     onStart: () -> Unit,
+    onTrash: () -> Unit,
     hasPermission: Boolean,
     isProcessing: Boolean
 ) {
@@ -295,20 +297,35 @@ fun SetupScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "📸 Photo Tinder",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (hasPermission) "Selecciona álbumes para revisar"
-                       else "Primero necesitamos permiso para acceder a tus fotos",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "📸 Photo Tinder",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (hasPermission) "Selecciona álbumes para revisar"
+                           else "Primero necesitamos permiso para acceder a tus fotos",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                )
+            }
+            IconButton(onClick = onTrash) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Papelera",
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                )
+            }
         }
 
         if (!hasPermission) {
@@ -907,12 +924,31 @@ fun recoverFromTrash(context: Context, photoUri: Uri) {
 
 fun deletePermanently(context: Context, photoUri: Uri) {
     try {
+        // En Android R+, debe estar en la papelera antes de eliminar permanentemente
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val values = ContentValues().apply {
+            // Primero marcar como trashed (si no lo está ya)
+            val trashValues = ContentValues().apply {
                 put(MediaStore.Images.Media.IS_TRASHED, 1)
             }
-            context.contentResolver.update(photoUri, values, null, null)
+            context.contentResolver.update(photoUri, trashValues, null, null)
+            // Pequeña espera para que MediaStore procese
+            Thread.sleep(100)
         }
-        context.contentResolver.delete(photoUri, null, null)
+        // Ahora eliminar permanentemente
+        val deleted = context.contentResolver.delete(photoUri, null, null)
+        if (deleted == 0) {
+            // Si no se pudo.delete directamente, en R+ necesita confirmación del sistema
+            // Intentar con el approach alternativo
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.IS_TRASHED, 0)
+                    }
+                    context.contentResolver.update(photoUri, values, null, null)
+                    Thread.sleep(50)
+                    context.contentResolver.delete(photoUri, null, null)
+                }
+            } catch (_: Exception) {}
+        }
     } catch (_: Exception) {}
 }
