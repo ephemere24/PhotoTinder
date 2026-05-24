@@ -13,6 +13,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -409,7 +411,7 @@ fun SetupScreen(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 16.dp)
-                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    .verticalScroll(rememberScrollState())
             ) {
                 albums.sortedByDescending { it.second.size }.forEach { (albumName, albumPhotos) ->
                     val isSelected = albumName in selectedAlbums
@@ -755,7 +757,7 @@ fun TrashScreen(
                 modifier = Modifier
                     .weight(1f)
                     .padding(16.dp)
-                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    .verticalScroll(rememberScrollState())
             ) {
                 Text(
                     text = "${trashed.size} fotos en la papelera",
