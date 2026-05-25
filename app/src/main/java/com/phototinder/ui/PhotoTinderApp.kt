@@ -41,6 +41,9 @@ import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.app.PendingIntent
+import android.content.IntentSender
+import android.os.Environment
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -54,6 +57,8 @@ data class PhotoItem(
 )
 
 enum class SwipeAction { KEEP, TRASH }
+
+const val DELETE_REQUEST_CODE = 1001
 
 // ─── Main App ─────────────────────────────────────────────────────
 
@@ -217,16 +222,45 @@ fun PhotoTinderApp() {
                     },
                     onDeletePermanently = { photo ->
                         scope.launch {
-                            withContext(Dispatchers.IO) {
+                            val pendingIntent = withContext(Dispatchers.IO) {
                                 deletePermanently(context, photo.uri)
                             }
+                            if (pendingIntent != null) {
+                                // Android R+: lanzar confirmación del sistema
+                                try {
+                                    val activity = context as? android.app.Activity
+                                    activity?.startIntentSenderForResult(
+                                        pendingIntent.intentSender,
+                                        DELETE_REQUEST_CODE, null, 0, 0, 0
+                                    )
+                                } catch (_: Exception) {}
+                            }
+                            // En pre-R ya se borró directamente
                             trashedPhotos = trashedPhotos - photo
                         }
                     },
                     onEmptyTrash = {
                         scope.launch {
-                            withContext(Dispatchers.IO) {
-                                trashedPhotos.forEach { deletePermanently(context, it.uri) }
+                            val pendingIntents = withContext(Dispatchers.IO) {
+                                val uris = trashedPhotos.map { it.uri }
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && uris.isNotEmpty()) {
+                                    val pi = MediaStore.createDeleteRequest(
+                                        context.contentResolver, uris
+                                    )
+                                    listOf(pi)
+                                } else {
+                                    uris.forEach { deletePermanently(context, it) }
+                                    emptyList()
+                                }
+                            }
+                            pendingIntents.forEach { pendingIntent ->
+                                try {
+                                    val activity = context as? android.app.Activity
+                                    activity?.startIntentSenderForResult(
+                                        pendingIntent.intentSender,
+                                        DELETE_REQUEST_CODE, null, 0, 0, 0
+                                    )
+                                } catch (_: Exception) {}
                             }
                             trashedPhotos = emptyList()
                         }
@@ -897,10 +931,18 @@ fun moveToTrash(context: Context, photoUri: Uri) {
             }
             context.contentResolver.update(photoUri, values, null, null)
         } else {
+            // Pre-R: mover archivo a carpeta privada y borrar de MediaStore
             val trashDir = File(context.getExternalFilesDir(null), ".phototinder_trash")
             if (!trashDir.exists()) trashDir.mkdirs()
+            val cursor = context.contentResolver.query(photoUri,
+                arrayOf(MediaStore.Images.Media.DISPLAY_NAME), null, null, null)
+            var fileName = "trash_${System.currentTimeMillis()}"
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    fileName = it.getString(0) ?: fileName
+                }
+            }
             val inputStream = context.contentResolver.openInputStream(photoUri) ?: return
-            val fileName = photoUri.lastPathSegment ?: "trash_${System.currentTimeMillis()}"
             val outFile = File(trashDir, fileName)
             FileOutputStream(outFile).use { output ->
                 inputStream.copyTo(output)
@@ -918,37 +960,70 @@ fun recoverFromTrash(context: Context, photoUri: Uri) {
                 put(MediaStore.Images.Media.IS_TRASHED, 0)
             }
             context.contentResolver.update(photoUri, values, null, null)
+        } else {
+            // Pre-R: restaurar desde carpeta privada de vuelta a MediaStore
+            val trashDir = File(context.getExternalFilesDir(null), ".phototinder_trash")
+            val cursor = context.contentResolver.query(photoUri,
+                arrayOf(MediaStore.Images.Media.DISPLAY_NAME), null, null, null)
+            var fileName = photoUri.lastPathSegment ?: return
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    fileName = it.getString(0) ?: fileName
+                }
+            }
+            val trashedFile = File(trashDir, fileName)
+            if (trashedFile.exists()) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+                }
+                val newUri = context.contentResolver.insert(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return
+                context.contentResolver.openOutputStream(newUri)?.use { output ->
+                    FileInputStream(trashedFile).use { input ->
+                        input.copyTo(output)
+                    }
+                }
+                trashedFile.delete()
+            }
         }
     } catch (_: Exception) {}
 }
 
-fun deletePermanently(context: Context, photoUri: Uri) {
+/**
+ * Elimina permanentemente una foto.
+ * - Android R+: devuelve un PendingIntent para confirmación del sistema (no ejecuta directamente)
+ * - Pre-R: borra directamente de MediaStore y del almacenamiento físico
+ * 
+ * Devuelve null si borró directamente (pre-R), o un PendingIntent si necesita
+ * confirmación del sistema (R+). El llamador debe lanzar el PendingIntent.
+ */
+fun deletePermanently(context: Context, photoUri: Uri): PendingIntent? {
     try {
-        // En Android R+, debe estar en la papelera antes de eliminar permanentemente
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Primero marcar como trashed (si no lo está ya)
-            val trashValues = ContentValues().apply {
-                put(MediaStore.Images.Media.IS_TRASHED, 1)
-            }
-            context.contentResolver.update(photoUri, trashValues, null, null)
-            // Pequeña espera para que MediaStore procese
-            Thread.sleep(100)
-        }
-        // Ahora eliminar permanentemente
-        val deleted = context.contentResolver.delete(photoUri, null, null)
-        if (deleted == 0) {
-            // Si no se pudo.delete directamente, en R+ necesita confirmación del sistema
-            // Intentar con el approach alternativo
+            // Android 11+: usar createDeleteRequest para confirmación del sistema
+            return MediaStore.createDeleteRequest(
+                context.contentResolver,
+                listOf(photoUri)
+            )
+        } else {
+            // Pre-R: borrar directamente
+            context.contentResolver.delete(photoUri, null, null)
+            // También intentar borrar el archivo físico
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Images.Media.IS_TRASHED, 0)
+                val projection = arrayOf(MediaStore.Images.Media.DATA)
+                val cursor = context.contentResolver.query(photoUri, projection, null, null, null)
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val path = it.getString(0)
+                        if (path != null) File(path).delete()
                     }
-                    context.contentResolver.update(photoUri, values, null, null)
-                    Thread.sleep(50)
-                    context.contentResolver.delete(photoUri, null, null)
                 }
             } catch (_: Exception) {}
+            return null
         }
-    } catch (_: Exception) {}
+    } catch (e: Exception) {
+        return null
+    }
 }
