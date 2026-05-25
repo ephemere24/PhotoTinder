@@ -11,7 +11,9 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -274,13 +276,14 @@ fun PhotoTinderApp() {
         if (showPermissionDenied) {
             AlertDialog(
                 onDismissRequest = { showPermissionDenied = false },
-                title = { Text("Permiso denegado") },
-                text = { Text("Necesitamos acceso a tus fotos. Ve a Ajustes > Permisos.") },
+                title = { Text("Permiso denegado", color = Color.White) },
+                text = { Text("Necesitamos acceso a tus fotos. Ve a Ajustes > Permisos.", color = Color(0xFFCCCCCC)) },
                 confirmButton = {
                     TextButton(onClick = { showPermissionDenied = false }) {
-                        Text("OK")
+                        Text("OK", color = Color.White)
                     }
-                }
+                },
+                containerColor = Color(0xFF1A1A1A)
             )
         }
 
@@ -293,7 +296,7 @@ fun PhotoTinderApp() {
                 contentAlignment = Alignment.TopCenter
             ) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF333333)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF222222)),
                     shape = RoundedCornerShape(24.dp)
                 ) {
                     Text(
@@ -328,7 +331,7 @@ fun SetupScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Black)
     ) {
         // Header
         Row(
@@ -343,21 +346,21 @@ fun SetupScreen(
                     text = "📸 Photo Tinder",
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = Color.White
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = if (hasPermission) "Selecciona álbumes para revisar"
                            else "Primero necesitamos permiso para acceder a tus fotos",
                     fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                    color = Color(0xFFAAAAAA)
                 )
             }
             IconButton(onClick = onTrash) {
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "Papelera",
-                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                    tint = Color(0xFFAAAAAA)
                 )
             }
         }
@@ -373,19 +376,15 @@ fun SetupScreen(
                         Icons.Default.PhotoLibrary,
                         contentDescription = null,
                         modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = Color.White
                     )
                     Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        "Acceso a fotos",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Acceso a fotos", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "Para funcionar, Photo Tinder necesita acceder a tus fotos",
                         textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                        color = Color(0xFFAAAAAA),
                         modifier = Modifier.padding(horizontal = 32.dp)
                     )
                     Spacer(modifier = Modifier.height(32.dp))
@@ -395,7 +394,8 @@ fun SetupScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 48.dp)
                             .height(56.dp),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                     ) {
                         Icon(Icons.Default.LockOpen, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -409,9 +409,9 @@ fun SetupScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Cargando álbumes...")
+                    Text("Cargando álbumes...", color = Color.White)
                 }
             }
         } else {
@@ -424,11 +424,17 @@ fun SetupScreen(
             ) {
                 SuggestionChip(
                     onClick = { },
-                    label = { Text("$selectedCount álbumes") }
+                    label = { Text("$selectedCount álbumes", color = Color.White) },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = Color(0xFF1A1A1A)
+                    )
                 )
                 SuggestionChip(
                     onClick = { },
-                    label = { Text("$selectedPhotos fotos") }
+                    label = { Text("$selectedPhotos fotos", color = Color.White) },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = Color(0xFF1A1A1A)
+                    )
                 )
             }
 
@@ -443,13 +449,15 @@ fun SetupScreen(
             ) {
                 OutlinedButton(
                     onClick = onSelectAll,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                 ) {
                     Text("Todos", fontSize = 12.sp)
                 }
                 OutlinedButton(
                     onClick = onDeselectAll,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                 ) {
                     Text("Ninguno", fontSize = 12.sp)
                 }
@@ -471,10 +479,7 @@ fun SetupScreen(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected)
-                                MaterialTheme.colorScheme.primaryContainer
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = if (isSelected) Color(0xFF222222) else Color(0xFF111111)
                         ),
                         onClick = { onAlbumToggle(albumName) }
                     ) {
@@ -484,18 +489,23 @@ fun SetupScreen(
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Checkbox(checked = isSelected, onCheckedChange = null)
+                            Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = null,
+                                colors = CheckboxDefaults.colors(checkedColor = Color.White, uncheckedColor = Color(0xFF666666))
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = albumName,
                                     fontWeight = FontWeight.Medium,
-                                    fontSize = 14.sp
+                                    fontSize = 14.sp,
+                                    color = Color.White
                                 )
                                 Text(
                                     text = "${albumPhotos.size} fotos",
                                     fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = Color(0xFF888888)
                                 )
                             }
                         }
@@ -511,7 +521,8 @@ fun SetupScreen(
                     .padding(16.dp)
                     .height(56.dp),
                 enabled = selectedAlbums.isNotEmpty(),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -539,11 +550,10 @@ fun SwipeScreen(
     onFinish: () -> Unit
 ) {
     if (photos.isEmpty() || currentIndex >= photos.size) {
-        // Done screen
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -552,19 +562,12 @@ fun SwipeScreen(
             ) {
                 Text("🎉", fontSize = 64.sp)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "¡Listo!",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("¡Listo!", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("No quedan más fotos por revisar")
+                Text("No quedan más fotos por revisar", color = Color(0xFFAAAAAA))
                 if (trashedPhotos.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "${trashedPhotos.size} fotos en la papelera",
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                    )
+                    Text("${trashedPhotos.size} fotos en la papelera", color = Color(0xFF888888))
                 }
                 Spacer(modifier = Modifier.height(32.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -584,16 +587,25 @@ fun SwipeScreen(
 
     val photo = photos[currentIndex]
     val total = photos.size
-    val offset = remember { mutableFloatStateOf(0f) }
+    val offsetX = remember { mutableFloatStateOf(0f) }
+    val swipeThreshold = 150f
+
+    fun confirmSwipe(action: SwipeAction) {
+        onSwiped(action, photo)
+        offsetX.floatValue = 0f
+        if (currentIndex + 1 < photos.size) {
+            onIndexChange(currentIndex + 1)
+        }
+    }
 
     LaunchedEffect(currentIndex) {
-        offset.floatValue = 0f
+        offsetX.floatValue = 0f
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Black)
     ) {
         // Top bar
         Row(
@@ -604,35 +616,115 @@ fun SwipeScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
             Text(
                 text = "${currentIndex + 1} / $total",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground
+                color = Color.White
             )
             IconButton(onClick = onTrash) {
-                Icon(Icons.Default.Delete, contentDescription = "Trash", tint = MaterialTheme.colorScheme.onBackground)
+                Icon(Icons.Default.Delete, contentDescription = "Trash", tint = Color.White)
             }
         }
 
-        // Photo card with swipe
+        // Photo card with swipe gesture
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 80.dp),
+                .padding(horizontal = 16.dp, vertical = 80.dp),
             contentAlignment = Alignment.Center
         ) {
+            // Background indicators (behind the card)
+            val progress = (offsetX.floatValue / swipeThreshold).coerceIn(-1f, 1f)
+            val absProgress = kotlin.math.abs(progress)
+
+            // Left indicator (trash) - shown when dragging left
+            if (offsetX.floatValue < -30f) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 24.dp)
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFE53935).copy(alpha = 0.9f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("PAPELERA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+                }
+            }
+
+            // Right indicator (keep) - shown when dragging right
+            if (offsetX.floatValue > 30f) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 24.dp)
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF4CAF50).copy(alpha = 0.9f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("GUARDAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+                }
+            }
+
+            // The draggable card
             Card(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        rotationZ = offset.floatValue / 30f
-                        translationX = offset.floatValue
+                        rotationZ = offsetX.floatValue / 40f
+                        translationX = offsetX.floatValue
+                        val scale = 1f - (absProgress * 0.05f)
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .pointerInput(currentIndex) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                // If dragged past threshold, confirm swipe
+                                if (offsetX.floatValue < -swipeThreshold) {
+                                    confirmSwipe(SwipeAction.TRASH)
+                                } else if (offsetX.floatValue > swipeThreshold) {
+                                    confirmSwipe(SwipeAction.KEEP)
+                                } else {
+                                    // Snap back
+                                    offsetX.floatValue = 0f
+                                }
+                            },
+                            onDragCancel = {
+                                offsetX.floatValue = 0f
+                            },
+                            onHorizontalDrag = { _, dragAmount ->
+                                offsetX.floatValue += dragAmount
+                            }
+                        )
                     },
-                shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A))
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
@@ -649,11 +741,11 @@ fun SwipeScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp)
+                            .height(100.dp)
                             .align(Alignment.BottomCenter)
                             .background(
                                 Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
                                 )
                             )
                     )
@@ -673,89 +765,36 @@ fun SwipeScreen(
                         )
                         Text(
                             text = photo.albumName,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = Color(0xFFCCCCCC),
                             fontSize = 12.sp
                         )
-                    }
-
-                    // Swipe indicators
-                    val rotation = offset.floatValue / 20f
-                    if (offset.floatValue < -50f) {
-                        Card(
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .padding(start = 32.dp)
-                                .graphicsLayer { rotationZ = rotation },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.Red)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Delete, contentDescription = null, tint = Color.White)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("PAPELERA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                        }
-                    }
-                    if (offset.floatValue > 50f) {
-                        Card(
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 32.dp)
-                                .graphicsLayer { rotationZ = rotation },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF4CAF50))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("GUARDAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                        }
                     }
                 }
             }
         }
 
-        // Action buttons
+        // Bottom action buttons (still work as tap fallback)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .padding(horizontal = 48.dp, vertical = 24.dp),
+                .padding(horizontal = 48.dp, vertical = 20.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            // Trash button
             FloatingActionButton(
-                onClick = {
-                    onSwiped(SwipeAction.TRASH, photo)
-                    if (currentIndex + 1 < photos.size) {
-                        onIndexChange(currentIndex + 1)
-                    }
-                },
+                onClick = { confirmSwipe(SwipeAction.TRASH) },
                 containerColor = Color(0xFFE53935),
-                modifier = Modifier.size(64.dp)
+                modifier = Modifier.size(56.dp)
             ) {
-                Icon(Icons.Default.Delete, contentDescription = "Papelera", tint = Color.White, modifier = Modifier.size(28.dp))
+                Icon(Icons.Default.Delete, contentDescription = "Papelera", tint = Color.White, modifier = Modifier.size(24.dp))
             }
 
-            // Keep button
             FloatingActionButton(
-                onClick = {
-                    onSwiped(SwipeAction.KEEP, photo)
-                    if (currentIndex + 1 < photos.size) {
-                        onIndexChange(currentIndex + 1)
-                    }
-                },
+                onClick = { confirmSwipe(SwipeAction.KEEP) },
                 containerColor = Color(0xFF4CAF50),
-                modifier = Modifier.size(64.dp)
+                modifier = Modifier.size(56.dp)
             ) {
-                Icon(Icons.Default.Favorite, contentDescription = "Guardar", tint = Color.White, modifier = Modifier.size(28.dp))
+                Icon(Icons.Default.Check, contentDescription = "Guardar", tint = Color.White, modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -777,13 +816,13 @@ fun TrashScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color.Black)
     ) {
         TopAppBar(
-            title = { Text("🗑️ Papelera (${trashed.size})") },
+            title = { Text("🗑️ Papelera (${trashed.size})", color = Color.White) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                 }
             },
             actions = {
@@ -792,15 +831,16 @@ fun TrashScreen(
                         Text("Vaciar", color = Color(0xFFE53935))
                     }
                 }
-            }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
         )
 
         if (trashed.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("🗑️", fontSize = 48.sp)
-                    Text("Papelera vacía", fontSize = 18.sp)
-                    Text("Las fotos eliminadas aparecerán aquí")
+                    Text("Papelera vacía", fontSize = 18.sp, color = Color.White)
+                    Text("Las fotos eliminadas aparecerán aquí", color = Color(0xFF888888))
                 }
             }
         } else {
@@ -813,7 +853,7 @@ fun TrashScreen(
                 Text(
                     text = "${trashed.size} fotos en la papelera",
                     fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    color = Color(0xFF888888),
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 trashed.forEach { photo ->
@@ -821,7 +861,8 @@ fun TrashScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(100.dp)
-                            .padding(vertical = 4.dp)
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF111111))
                     ) {
                         Row(
                             modifier = Modifier
@@ -842,8 +883,8 @@ fun TrashScreen(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(text = photo.name, fontWeight = FontWeight.Medium, maxLines = 1)
-                                Text(text = photo.albumName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = photo.name, fontWeight = FontWeight.Medium, maxLines = 1, color = Color.White)
+                                Text(text = photo.albumName, fontSize = 12.sp, color = Color(0xFF888888))
                             }
                             IconButton(onClick = { onRecover(photo) }) {
                                 Icon(Icons.Default.RestoreFromTrash, contentDescription = "Recuperar", tint = Color(0xFF4CAF50))
@@ -861,8 +902,8 @@ fun TrashScreen(
     if (showConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
-            title = { Text("¿Vaciar papelera?") },
-            text = { Text("Se eliminarán ${trashed.size} fotos de forma permanente. Esta acción no se puede deshacer.") },
+            title = { Text("¿Vaciar papelera?", color = Color.White) },
+            text = { Text("Se eliminarán ${trashed.size} fotos de forma permanente. Esta acción no se puede deshacer.", color = Color(0xFFCCCCCC)) },
             confirmButton = {
                 TextButton(onClick = {
                     onEmptyTrash()
@@ -873,9 +914,12 @@ fun TrashScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showConfirmDialog = false }) {
-                    Text("Cancelar")
+                    Text("Cancelar", color = Color.White)
                 }
-            }
+            },
+            containerColor = Color(0xFF1A1A1A),
+            titleContentColor = Color.White,
+            textContentColor = Color(0xFFCCCCCC)
         )
     }
 }
