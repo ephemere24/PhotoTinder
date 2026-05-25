@@ -333,37 +333,49 @@ fun SetupScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // Header
-        Row(
+        // Header minimalista
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 24.dp, vertical = 20.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = "📸 Photo Tinder",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    text = "Photo Tinder",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    letterSpacing = 0.5.sp
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (hasPermission) "Selecciona álbumes para revisar"
-                           else "Primero necesitamos permiso para acceder a tus fotos",
-                    fontSize = 14.sp,
-                    color = Color(0xFFAAAAAA)
-                )
+                IconButton(onClick = onTrash) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Papelera",
+                        tint = Color(0xFF666666)
+                    )
+                }
             }
-            IconButton(onClick = onTrash) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Papelera",
-                    tint = Color(0xFFAAAAAA)
-                )
-            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (hasPermission) "Selecciona los álbumes que quieras revisar"
+                       else "Necesitamos acceso a tus fotos para empezar",
+                fontSize = 13.sp,
+                color = Color(0xFF888888),
+                lineHeight = 18.sp
+            )
         }
+
+        // Divider sutil
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(0.5.dp)
+                .background(Color(0xFF1A1A1A))
+        )
 
         if (!hasPermission) {
             // Permission request UI
@@ -371,35 +383,44 @@ fun SetupScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 40.dp)
+                ) {
                     Icon(
                         Icons.Default.PhotoLibrary,
                         contentDescription = null,
-                        modifier = Modifier.size(80.dp),
-                        tint = Color.White
+                        modifier = Modifier.size(64.dp),
+                        tint = Color(0xFF444444)
                     )
                     Spacer(modifier = Modifier.height(24.dp))
-                    Text("Acceso a fotos", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(
+                        "Acceso a fotos",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Para funcionar, Photo Tinder necesita acceder a tus fotos",
+                        "Photo Tinder necesita permiso para acceder a tu galería de fotos",
                         textAlign = TextAlign.Center,
-                        color = Color(0xFFAAAAAA),
-                        modifier = Modifier.padding(horizontal = 32.dp)
+                        color = Color(0xFF888888),
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
                     )
                     Spacer(modifier = Modifier.height(32.dp))
                     Button(
                         onClick = onStart,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 48.dp)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black
+                        )
                     ) {
-                        Icon(Icons.Default.LockOpen, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Dar permiso", fontWeight = FontWeight.Bold)
+                        Text("Permitir acceso", fontWeight = FontWeight.Medium, fontSize = 14.sp)
                     }
                 }
             }
@@ -409,63 +430,75 @@ fun SetupScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Color.White)
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(32.dp)
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Cargando álbumes...", color = Color.White)
+                    Text("Cargando álbumes...", color = Color(0xFF888888), fontSize = 13.sp)
                 }
             }
         } else {
-            // Stats chips
+            // Stats en formato limpio
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                SuggestionChip(
-                    onClick = { },
-                    label = { Text("$selectedCount álbumes", color = Color.White) },
-                    colors = SuggestionChipDefaults.suggestionChipColors(
-                        containerColor = Color(0xFF1A1A1A)
+                Column {
+                    Text(
+                        text = "$selectedCount",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
-                )
-                SuggestionChip(
-                    onClick = { },
-                    label = { Text("$selectedPhotos fotos", color = Color.White) },
-                    colors = SuggestionChipDefaults.suggestionChipColors(
-                        containerColor = Color(0xFF1A1A1A)
+                    Text(
+                        text = "álbumes",
+                        fontSize = 11.sp,
+                        color = Color(0xFF666666)
                     )
-                )
+                }
+                Column {
+                    Text(
+                        text = "$selectedPhotos",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "fotos",
+                        fontSize = 11.sp,
+                        color = Color(0xFF666666)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Select/Deselect all
+            // Select/Deselect all — minimalista
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
+                TextButton(
                     onClick = onSelectAll,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text("Todos", fontSize = 12.sp)
+                    Text("Seleccionar todo", color = Color.White, fontSize = 13.sp)
                 }
-                OutlinedButton(
+                TextButton(
                     onClick = onDeselectAll,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text("Ninguno", fontSize = 12.sp)
+                    Text("Deseleccionar", color = Color(0xFF666666), fontSize = 13.sp)
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Album scrollable list
+            // Album list
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -477,37 +510,42 @@ fun SetupScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 3.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) Color(0xFF222222) else Color(0xFF111111)
+                            containerColor = if (isSelected) Color(0xFF1A1A1A) else Color(0xFF0D0D0D)
                         ),
+                        shape = RoundedCornerShape(12.dp),
                         onClick = { onAlbumToggle(albumName) }
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
                                 checked = isSelected,
                                 onCheckedChange = null,
-                                colors = CheckboxDefaults.colors(checkedColor = Color.White, uncheckedColor = Color(0xFF666666))
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = Color.White,
+                                    uncheckedColor = Color(0xFF444444),
+                                    checkmarkColor = Color.Black
+                                ),
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = albumName,
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 14.sp,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "${albumPhotos.size} fotos",
-                                    fontSize = 12.sp,
-                                    color = Color(0xFF888888)
-                                )
-                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = albumName,
+                                fontWeight = FontWeight.Normal,
+                                fontSize = 14.sp,
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "${albumPhotos.size}",
+                                fontSize = 13.sp,
+                                color = Color(0xFF666666)
+                            )
                         }
                     }
                 }
@@ -518,19 +556,30 @@ fun SetupScreen(
                 onClick = onStart,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .height(56.dp),
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .height(52.dp),
                 enabled = selectedAlbums.isNotEmpty(),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Empezar ($selectedPhotos fotos)",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    disabledContainerColor = Color(0xFF1A1A1A),
+                    disabledContentColor = Color(0xFF444444)
                 )
+            ) {
+                Text(
+                    "Empezar",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (selectedPhotos > 0) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "($selectedPhotos)",
+                        fontSize = 13.sp,
+                        color = Color(0xFF888888)
+                    )
+                }
             }
         }
     }
