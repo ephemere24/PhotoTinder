@@ -2,7 +2,15 @@
 
 Android app para filtrar y organizar tu galería de fotos con un gesto de swipe, al estilo Tinder.
 
+# PhotoTinder
 
+<p align="center">
+  <img src="assets/Screenshot_20260525_221235.jpg" width="300">
+</p>
+
+<p align="center">
+  <img src="assets/Screenshot_20260525_221331.jpg" width="300">
+</p>
 
 ## Características
 
