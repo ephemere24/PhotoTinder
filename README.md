@@ -19,7 +19,7 @@ Android app para filtrar y organizar tu galería de fotos con un gesto de swipe,
 ## Requisitos
 
 - Android 8.0 (API 26) o superior
-- Permiso de acceso a almacenamiento/motos
+- Permiso de acceso a almacenamiento
 
 ## Instalación
 
@@ -48,14 +48,11 @@ app/
 ./gradlew assembleDebug
 ```
 
-El APK se genera en `app/build/outputs/apk/debug/`.
-
 ## Tecnologías
 
 - **Kotlin** + **Jetpack Compose** — UI declarativa
 - **Material 3** — Componentes de diseño
 - **MediaStore API** — Acceso a la galería del dispositivo
-- **GitHub Actions** — CI/CD automatizado
 
 ## Licencia
 
